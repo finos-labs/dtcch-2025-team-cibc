@@ -6,10 +6,13 @@ import matplotlib.pyplot as plt
 from collections import Counter
 from wordcloud import WordCloud
 import datetime
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Set up the AWS session
 session = boto3.Session()
-#session = boto3.Session(profile_name='hackathon-participant-418272756489')
+# session = boto3.Session(profile_name='hackathon-participant-418272756489')
 s3_client = session.client("s3")
 
 # S3 Bucket and Folder Paths
@@ -19,6 +22,36 @@ folder_paths = {
     'CSA': 'regulatory-scraped-data/cibc_CSA_data_class/',
     'FCA': 'regulatory-scraped-data/cibc_FCA_data_class/'
 }
+
+# Email Configuration
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 587
+SMTP_USERNAME = "hackathoncibc@gmail.com"
+SMTP_PASSWORD = "jzfa ghyn rsvi vosk"
+SENDER_EMAIL = "hackathoncibc@gmail.com"
+RECIPIENT_EMAIL = "hemnath283@gmail.com"
+ 
+ 
+# Track last known news updates
+last_news_updates = {}
+ 
+# Function to send an email notification
+def send_email_notification(subject, body):
+    msg = MIMEMultipart()
+    msg['From'] = SENDER_EMAIL
+    msg['To'] = RECIPIENT_EMAIL
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'plain'))
+ 
+    try:
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        server.login(SMTP_USERNAME, SMTP_PASSWORD)
+        server.sendmail(SENDER_EMAIL, RECIPIENT_EMAIL, msg.as_string())
+        server.quit()
+        st.success("📩 Email notification sent successfully!")
+    except Exception as e:
+        st.error(f"⚠ Failed to send email: {str(e)}")
 
 # Function to list JSON files in S3
 def get_all_json_files(bucket_name, prefix):
@@ -62,6 +95,13 @@ def display_regulatory_updates():
  
             st.markdown(f"<h3 style='color: #4CAF50;'>🔍 Latest Update from {selected_folder}</h3>", unsafe_allow_html=True)
             st.table(df)
+            global last_news_updates
+            current_top_5_news = df.to_dict()
+ 
+            if selected_folder not in last_news_updates or last_news_updates[selected_folder] != current_top_5_news:
+                last_news_updates[selected_folder] = current_top_5_news
+                email_body = f"New regulatory updates available for {selected_folder}:\n\n{df.to_string(index=False)}"
+                send_email_notification(f"🔔 {selected_folder} News Update", email_body)
         else:
             st.json(json_data)
     else:
@@ -125,6 +165,30 @@ def get_lex_response(user_input):
     except Exception as e:
         return f"Error: {str(e)}"
 
+# Function to display learning resources
+def display_learning_resources():
+    st.markdown("<h2 style='text-align: center; color: #0099ff;'>📚 Learning Resources</h2>", unsafe_allow_html=True)
+ 
+    resources = {
+        "CSA": [
+            {"title": "CSA Website", "link": "https://www.securities-administrators.ca/"},
+            {"title": "CSA Regulations", "link": "https://www.osc.ca/en/securities-law/instruments-rules-policies"},
+        ],
+        "CFTC": [
+            {"title": "CFTC Official Website", "link": "https://www.cftc.gov/"},
+            {"title": "CFTC Laws & Regulations", "link": "https://www.cftc.gov/LawRegulation/index.htm"},
+        ],
+        "FCA": [
+            {"title": "FCA Official Website", "link": "https://www.fca.org.uk/"},
+            {"title": "FCA Handbook", "link": "https://www.handbook.fca.org.uk/"},
+        ],
+    }
+ 
+    selected_body = st.selectbox("📌 Select a Regulatory Body:", list(resources.keys()))
+    st.write("🔗 **Useful Links:**")
+ 
+    for resource in resources[selected_body]:
+        st.markdown(f"- [{resource['title']}]({resource['link']})")
 # Chatbot interaction
 def chat_with_bot():
     st.markdown("<h1 style='text-align: center; color: #0099ff;'>💬 Lex Chatbot</h1>", unsafe_allow_html=True)
@@ -196,11 +260,13 @@ def sentiment_analysis_option():
 # Streamlit UI
 def main():
     st.sidebar.title("📌 RegCentral")
-    option = st.sidebar.radio("🔍 Choose an option", ("Latest Regulatory Updates & Trends", "Chat with Bot", "Sentiment & Entity Analysis"))
+    option = st.sidebar.radio("🔍 Choose an option", ("Latest Regulatory Updates & Trends","Learning Resources", "Chat with Bot", "Sentiment & Entity Analysis"))
     
     if option == "Latest Regulatory Updates & Trends":
         display_regulatory_updates()
         display_trends()
+    elif option == "Learning Resources":
+        display_learning_resources()
     elif option == "Chat with Bot":
         chat_with_bot()
     elif option == "Sentiment & Entity Analysis":
