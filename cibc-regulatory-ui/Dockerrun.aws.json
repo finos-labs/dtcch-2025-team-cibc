@@ -1,0 +1,13 @@
+{
+  "AWSEBDockerrunVersion": "1",
+  "Image": {
+    "Name": "hemnath283/cibc-streamlit-ui-app:latest", 
+    "Update": "true"
+  },
+  "Ports": [
+    {
+      "ContainerPort": "8501"
+    }
+  ],
+  "Logging": "/var/log/nginx"
+}
